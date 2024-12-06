@@ -122,26 +122,38 @@ export class Type extends DataClass {
     }
 
     getAllNotes(options?: { withSubtypes?: boolean }) {
-        if (options?.withSubtypes) {
-            throw new Error("NotImplemented: withSubtypes");
-        }
-
         if (!this.isCreateable) {
             throw new Error("Non-createable types cannot getAllNotes()");
         }
 
-        let paths;
+        // Get all folders to search - include this type's folder and all descendant type folders
+        let folders = new Set<string>();
+        folders.add(this.folder);
+        
+        if (options?.withSubtypes) {
+            for (let type of Object.values(gctx.graph.types)) {
+                if (type.getAncestor(this.name)) {
+                    folders.add(type.folder);
+                }
+            }
+        }
+
+        let paths = new Set<string>();
         if (gctx.dv != null) {
-            paths = gctx.dv.pagePaths(`"${this.folder}"`);
+            let query = Array.from(folders).map(f => `"${f}"`).join(" OR ");
+            paths = gctx.dv.pagePaths(query);
         } else {
-            let folder = gctx.app.vault.getAbstractFileByPath(this.folder);
-            if (folder == null) {
-                return [];
+            for (let folderPath of folders) {
+                let folder = gctx.app.vault.getAbstractFileByPath(folderPath);
+                if (folder == null) continue;
+                if (!(folder instanceof TFolder)) {
+                    throw new Error(`Specified type folder is a file: ${folderPath}`);
+                }
+                let folderPaths = folder.children
+                    .filter((x) => x instanceof TFile && x.extension == "md")
+                    .map((x) => x.path);
+                folderPaths.forEach(p => paths.add(p));
             }
-            if (!(folder instanceof TFolder)) {
-                throw new Error("Specified type folder is a file");
-            }
-            paths = folder.children.filter((x) => x instanceof TFile && x.extension == "md").map((x) => x.path);
         }
 
         return [...paths].map((path) => Note.new(path, { type: this }));

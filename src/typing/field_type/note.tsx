@@ -62,14 +62,18 @@ export class Note extends FieldType<Note> {
     Picker = () => {
         const preview = (value: string) => <this.Display value={value} />;
 
-        let options: IComboboxOption[] = Array.from(
-            gctx.dv.pages(this.query).map(
-                (p): IComboboxOption => ({
-                    value: this.short ? p.file.name : p.file.path,
-                    label: p.file.name,
-                    display: preview,
-                })
-            )
+        // Get all notes of the specified types, including subtypes
+        let notes = [];
+        for (let type of this.types) {
+            notes.push(...type.getAllNotes({ withSubtypes: true }));
+        }
+        
+        let options: IComboboxOption[] = notes.map(
+            (note): IComboboxOption => ({
+                value: this.short ? note.filename : note.path,
+                label: note.filename,
+                display: preview,
+            })
         );
         return <Pickers.Note options={options} subpath={this.subpath} display={this.display} preview={preview} />;
     };
